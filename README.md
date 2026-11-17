@@ -15,6 +15,15 @@ npm run dev
 npm run build
 ```
 
+## Implantação no Cloudflare Pages
+
+- Repositório: `hadassamoda/hadassa-modapraia`
+- Branch de produção: `main`
+- Comando de build: `npm run build`
+- Diretório de saída: `dist`
+- Diretório raiz: `/`
+- Atualizações automáticas: habilitadas para commits na branch `main`.
+
 ## Estado das integrações
 
 - Vitrine responsiva, categorias e sacola demonstrativa implementadas.
