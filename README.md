@@ -30,3 +30,6 @@ npm run build
 - Cloudflare Pages e banco Cloudflare D1 provisionados.
 - Catálogo, estoque, clientes, pedidos, checkout, pagamento Pix/cartão, cálculo de frete, autenticação e painel administrativo ainda precisam de API e credenciais reais.
 - Não usar para receber pagamentos reais até concluir as integrações e os testes.
+
+
+Painel administrativo de produtos disponível em `/admin/`. A API protegida utiliza `ADMIN_PASSWORD` e o banco D1 vinculado como `DB`.
