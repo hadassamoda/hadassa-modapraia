@@ -53,11 +53,22 @@ async function getProducts(db, includeInactive=false) {
   const {results=[]}=await db.prepare(sql).all();
   return results.map(p=>({...p,active:Boolean(p.active),sizes:sizesValue(p.sizes_json)}));
 }
+function imageError(image) {
+  if(!image) return null;
+  if(typeof image!=="string" || image.length>700000) return "A foto ficou muito grande ou é inválida. Escolha uma imagem menor.";
+  if(image.startsWith("data:")) {
+    if(!/^data:image\/(?:webp|jpeg|png|gif);base64,[a-z0-9+/]+=*$/i.test(image)) return "Formato de foto não permitido. Use JPG, PNG ou WEBP.";
+  } else {
+    try { const u=new URL(image); if(!["http:","https:"].includes(u.protocol)) return "O endereço da foto precisa começar com http:// ou https://"; }
+    catch { return "O endereço da foto não é válido."; }
+  }
+  return null;
+}
 async function saveImage(db, productId, image) {
+  const invalid=imageError(image);
+  if(invalid) throw new Error(invalid);
   await db.prepare("DELETE FROM product_images WHERE product_id=?").bind(productId).run();
   if(image) {
-    if(typeof image!=="string" || (!image.startsWith("data:image/") && !/^https?:\/\//i.test(image))) throw new Error("A foto enviada não é válida.");
-    if(image.length>700000) throw new Error("A foto ficou muito grande. Escolha uma imagem menor.");
     await db.prepare("INSERT INTO product_images (product_id,image_url,alt_text,sort_order) VALUES (?,?,?,0)")
       .bind(productId,image,"Foto do produto").run();
   }
@@ -82,6 +93,10 @@ export async function onRequest({request,env}) {
     if(request.method==="POST" || request.method==="PUT") {
       let p; try { p=await request.json(); } catch { return json({error:"Dados inválidos."},400); }
       if(!p.name?.trim() || !Number.isFinite(Number(p.price)) || Number(p.price)<0) return json({error:"Informe nome e preço válido."},400);
+      const stock=Number(p.stock??0);
+      if(!Number.isSafeInteger(stock) || stock<0) return json({error:"Informe uma quantidade de estoque válida."},400);
+      const invalidImage=imageError(p.image||"");
+      if(invalidImage) return json({error:invalidImage},400);
       const catId=await categoryId(env.DB,p.category);
       const sizes=String(p.sizes||"").split(",").map(v=>v.trim()).filter(Boolean);
       const sizesJson=sizes.length?JSON.stringify(sizes):null;
@@ -89,7 +104,7 @@ export async function onRequest({request,env}) {
       if(request.method==="POST") {
         const slug=slugify(p.name)+"-"+crypto.randomUUID().slice(0,8);
         const r=await env.DB.prepare("INSERT INTO products (category_id,name,slug,description,price_cents,stock_quantity,sizes_json,active,updated_at) VALUES (?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
-          .bind(catId,p.name.trim(),slug,p.description||"",Math.round(Number(p.price)*100),Math.max(0,Number(p.stock)||0),sizesJson,active).run();
+          .bind(catId,p.name.trim(),slug,p.description||"",Math.round(Number(p.price)*100),stock,sizesJson,active).run();
         const id=r.meta.last_row_id;
         await saveImage(env.DB,id,p.image||"");
         return json({ok:true,id},201);
@@ -97,7 +112,7 @@ export async function onRequest({request,env}) {
       const id=Number(url.searchParams.get("id"));
       if(!Number.isInteger(id)||id<1) return json({error:"ID inválido."},400);
       const r=await env.DB.prepare("UPDATE products SET category_id=?,name=?,description=?,price_cents=?,stock_quantity=?,sizes_json=?,active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-        .bind(catId,p.name.trim(),p.description||"",Math.round(Number(p.price)*100),Math.max(0,Number(p.stock)||0),sizesJson,active,id).run();
+        .bind(catId,p.name.trim(),p.description||"",Math.round(Number(p.price)*100),stock,sizesJson,active,id).run();
       if(!r.meta.changes) return json({error:"Produto não encontrado."},404);
       await saveImage(env.DB,id,p.image||"");
       return json({ok:true});
@@ -105,9 +120,14 @@ export async function onRequest({request,env}) {
     if(request.method==="DELETE") {
       const id=Number(url.searchParams.get("id"));
       if(!Number.isInteger(id)||id<1) return json({error:"ID inválido."},400);
-      await env.DB.prepare("DELETE FROM product_images WHERE product_id=?").bind(id).run();
-      const r=await env.DB.prepare("DELETE FROM products WHERE id=?").bind(id).run();
-      return r.meta.changes?json({ok:true}):json({error:"Produto não encontrado."},404);
+      try {
+        await env.DB.prepare("DELETE FROM product_images WHERE product_id=?").bind(id).run();
+        const r=await env.DB.prepare("DELETE FROM products WHERE id=?").bind(id).run();
+        return r.meta.changes?json({ok:true}):json({error:"Produto não encontrado."},404);
+      } catch(error) {
+        if(String(error?.message||"").includes("FOREIGN KEY constraint failed")) return json({error:"Este produto está vinculado a um pedido e não pode ser excluído. Edite o produto e marque como Inativo."},409);
+        throw error;
+      }
     }
     return json({error:"Método não permitido."},405);
   } catch(error) {
