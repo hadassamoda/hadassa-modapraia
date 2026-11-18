@@ -1,9 +1,9 @@
 const headers={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers});
 const enc=new TextEncoder();
-const b64=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,"").replace(/\\+/g,"-").replace(/\\//g,"_");
+const b64=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
 async function sign(secret,value){const key=await crypto.subtle.importKey("raw",enc.encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);return b64(await crypto.subtle.sign("HMAC",key,enc.encode(value)));}
-async function authorized(request,secret){const raw=request.headers.get("authorization")||"";const parts=raw.replace(/^Bearer\\s+/i,"").split(".");if(parts.length!==2)return false;if(await sign(secret,parts[0])!==parts[1])return false;try{return JSON.parse(atob(parts[0].replace(/-/g,"+").replace(/_/g,"/"))).exp>Date.now();}catch{return false;}}
+async function authorized(request,secret){const raw=request.headers.get("authorization")||"";const parts=raw.replace(/^Bearer\s+/i,"").split(".");if(parts.length!==2)return false;if(await sign(secret,parts[0])!==parts[1])return false;try{return JSON.parse(atob(parts[0].replace(/-/g,"+").replace(/_/g,"/"))).exp>Date.now();}catch{return false;}}
 const clean=(v,max=120)=>String(v??"").trim().slice(0,max);
 async function ensureTables(db){
  await db.prepare("CREATE TABLE IF NOT EXISTS coupons (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE COLLATE NOCASE, discount_type TEXT NOT NULL CHECK(discount_type IN ('percent','fixed')), discount_value INTEGER NOT NULL, min_subtotal_cents INTEGER NOT NULL DEFAULT 0, max_uses INTEGER, used_count INTEGER NOT NULL DEFAULT 0, starts_at TEXT, expires_at TEXT, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
@@ -39,7 +39,7 @@ export async function onRequest({request,env}){
   if(request.method==="GET") {const {results=[]}=await env.DB.prepare("SELECT * FROM coupons ORDER BY created_at DESC,id DESC").all();return json({coupons:results});}
   if(request.method==="POST"){
    let b;try{b=await request.json();}catch{return json({error:"Dados inválidos."},400);}
-   const code=clean(b.code,40).toUpperCase().replace(/\\s+/g,""),type=b.discount_type,value=Number(b.discount_value),minimum=Number(b.min_subtotal_cents||0),max=b.max_uses===""||b.max_uses===null||b.max_uses===undefined?null:Number(b.max_uses),starts=clean(b.starts_at,30)||null,expires=clean(b.expires_at,30)||null;
+   const code=clean(b.code,40).toUpperCase().replace(/\s+/g,""),type=b.discount_type,value=Number(b.discount_value),minimum=Number(b.min_subtotal_cents||0),max=b.max_uses===""||b.max_uses===null||b.max_uses===undefined?null:Number(b.max_uses),starts=clean(b.starts_at,30)||null,expires=clean(b.expires_at,30)||null;
    if(!/^[A-Z0-9_-]{3,40}$/.test(code))return json({error:"Use um código de 3 a 40 caracteres (letras, números, hífen ou underline)."},400);
    if(!["percent","fixed"].includes(type)||!Number.isSafeInteger(value)||value<1||(type==="percent"&&value>90))return json({error:"Desconto inválido. Percentual de 1% a 90% ou valor fixo em centavos."},400);
    if(!Number.isSafeInteger(minimum)||minimum<0||!(max===null||(Number.isSafeInteger(max)&&max>0)))return json({error:"Pedido mínimo ou limite de usos inválido."},400);
