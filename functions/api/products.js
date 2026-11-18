@@ -1,7 +1,7 @@
 const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 const json = (data, status=200) => new Response(JSON.stringify(data), { status, headers });
 const enc = new TextEncoder();
-const b64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,"").replace(/\\+/g,"-").replace(/\\//g,"_");
+const b64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
 async function sign(secret, value) {
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), {name:"HMAC",hash:"SHA-256"}, false, ["sign"]);
   return b64(await crypto.subtle.sign("HMAC", key, enc.encode(value)));
@@ -12,7 +12,7 @@ async function token(secret, exp) {
 }
 async function authorized(request, secret) {
   const raw = request.headers.get("authorization") || "";
-  const parts = raw.replace(/^Bearer\\s+/i,"").split(".");
+  const parts = raw.replace(/^Bearer\s+/i,"").split(".");
   if(parts.length !== 2) return false;
   const expected = await sign(secret, parts[0]);
   if(expected !== parts[1]) return false;
@@ -23,7 +23,7 @@ async function authorized(request, secret) {
   } catch { return false; }
 }
 const defaultCategories = ["Moda praia","Biquínis","Maiôs","Saídas de praia","Conjuntos","Shorts e calças","Acessórios","Outros"];
-const slugify = value => String(value||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "produto";
+const slugify = value => String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "produto";
 async function ensureCategories(db) {
   for(let i=0;i<defaultCategories.length;i++) {
     const name=defaultCategories[i];
@@ -56,7 +56,7 @@ async function getProducts(db, includeInactive=false) {
 async function saveImage(db, productId, image) {
   await db.prepare("DELETE FROM product_images WHERE product_id=?").bind(productId).run();
   if(image) {
-    if(typeof image!=="string" || (!image.startsWith("data:image/") && !/^https?:\\/\\//i.test(image))) throw new Error("A foto enviada não é válida.");
+    if(typeof image!=="string" || (!image.startsWith("data:image/") && !/^https?:\/\//i.test(image))) throw new Error("A foto enviada não é válida.");
     if(image.length>700000) throw new Error("A foto ficou muito grande. Escolha uma imagem menor.");
     await db.prepare("INSERT INTO product_images (product_id,image_url,alt_text,sort_order) VALUES (?,?,?,0)")
       .bind(productId,image,"Foto do produto").run();
