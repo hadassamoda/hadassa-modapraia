@@ -37,12 +37,12 @@ export async function onRequest({request, env}) {
     if(typeof body.password !== "string" || body.password !== env.ADMIN_PASSWORD) return json({error:"Senha incorreta."},401);
     return json({token:await token(env.ADMIN_PASSWORD, Date.now()+12*60*60*1000)});
   }
-  if(!await authorized(request, env.ADMIN_PASSWORD)) return json({error:"Acesso não autorizado."},401);
   await ensure(env.DB);
   if(request.method === "GET") {
-    const {results=[]} = await env.DB.prepare("SELECT * FROM products ORDER BY id DESC").all();
+    const {results=[]} = await env.DB.prepare("SELECT * FROM products WHERE active = 1 ORDER BY id DESC").all();
     return json({products:results});
   }
+  if(!await authorized(request, env.ADMIN_PASSWORD)) return json({error:"Acesso não autorizado."},401);
   if(request.method === "POST") {
     let p; try { p=await request.json(); } catch { return json({error:"Dados inválidos."},400); }
     if(!p.name?.trim() || !Number.isFinite(Number(p.price))) return json({error:"Informe nome e preço válido."},400);
