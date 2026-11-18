@@ -23,17 +23,37 @@ async function createOrder(request,db){
  let subtotal=0;
  for(const item of items){const p=productRows.find(x=>x.id===item.id);if(!p.active)return json({error:p.name+" não está disponível no momento."},409);if(p.stock_quantity<item.quantity)return json({error:"Estoque insuficiente para "+p.name+". Disponível: "+p.stock_quantity+"."},409);const sizes=parseJson(p.sizes_json);if(Array.isArray(sizes)&&sizes.length&&!sizes.includes(item.size))return json({error:"Escolha um tamanho válido para "+p.name+"."},400);item.product=p;subtotal+=p.price_cents*item.quantity;}
  if(!Number.isSafeInteger(subtotal)||subtotal<0)return json({error:"Não foi possível calcular o total."},400);
+ let coupon=null,discount=0,couponCode=clean(b.coupon_code,40).toUpperCase();
+ if(couponCode){
+  await db.prepare("CREATE TABLE IF NOT EXISTS coupons (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE COLLATE NOCASE, discount_type TEXT NOT NULL CHECK(discount_type IN ('percent','fixed')), discount_value INTEGER NOT NULL, min_subtotal_cents INTEGER NOT NULL DEFAULT 0, max_uses INTEGER, used_count INTEGER NOT NULL DEFAULT 0, starts_at TEXT, expires_at TEXT, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+  await db.prepare("CREATE TABLE IF NOT EXISTS order_coupon_redemptions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, coupon_id INTEGER NOT NULL, code TEXT NOT NULL, discount_cents INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+  coupon=await db.prepare("SELECT * FROM coupons WHERE code=? COLLATE NOCASE").bind(couponCode).first();
+  if(!coupon)return json({error:"Cupom não encontrado."},400);
+  const now=Date.now(),start=coupon.starts_at?Date.parse(String(coupon.starts_at).replace(" ","T")+"Z"):0,end=coupon.expires_at?Date.parse(String(coupon.expires_at).replace(" ","T")+"Z"):Infinity;
+  if(!coupon.active)return json({error:"Este cupom não está ativo."},400);
+  if(start&&start>now)return json({error:"Este cupom ainda não começou."},400);
+  if(end<now)return json({error:"Este cupom expirou."},400);
+  if(coupon.max_uses!==null&&Number(coupon.used_count)>=Number(coupon.max_uses))return json({error:"Este cupom atingiu o limite de utilizações."},400);
+  if(subtotal<Number(coupon.min_subtotal_cents||0))return json({error:"O pedido mínimo para este cupom é R$ "+(Number(coupon.min_subtotal_cents)/100).toFixed(2).replace(".",",")+"."},400);
+  discount=Math.min(subtotal,coupon.discount_type==="percent"?Math.floor(subtotal*Math.min(90,Number(coupon.discount_value))/100):Number(coupon.discount_value));
+ }
+ const total=subtotal-discount;
  const orderNumber="HM-"+new Date().toISOString().slice(0,10).replace(/-/g,"")+"-"+crypto.randomUUID().slice(0,6).toUpperCase();
  const addressJson=JSON.stringify({recipient:name,street,number,complement:clean(address.complement,100),neighborhood,city,state,postal_code:postal});
  const requestRows=items.map((x,i)=>(i?" UNION ALL ":"")+"SELECT ? AS id, ? AS qty").join("");
  const stockBindings=items.flatMap(x=>[x.id,x.quantity]);
- const orderSql="INSERT INTO orders (order_number,customer_id,status,payment_method,payment_status,subtotal_cents,shipping_cents,discount_cents,total_cents,shipping_address_json) SELECT ?, (SELECT id FROM customers WHERE email=?), 'pending','A combinar','pending',?,0,0,?,? WHERE NOT EXISTS (SELECT 1 FROM ("+requestRows+") requested LEFT JOIN products p ON p.id=requested.id WHERE p.id IS NULL OR p.active!=1 OR p.stock_quantity<requested.qty)";
- const statements=[db.prepare("INSERT INTO customers (name,email,phone) VALUES (?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,phone=excluded.phone").bind(name,email,phone),db.prepare(orderSql).bind(orderNumber,email,subtotal,subtotal,addressJson,...stockBindings)];
+ const couponGuard=coupon?" AND EXISTS (SELECT 1 FROM coupons WHERE id=? AND active=1 AND (max_uses IS NULL OR used_count<max_uses))":"";
+ const orderSql="INSERT INTO orders (order_number,customer_id,status,payment_method,payment_status,subtotal_cents,shipping_cents,discount_cents,total_cents,shipping_address_json) SELECT ?, (SELECT id FROM customers WHERE email=?), 'pending','A combinar','pending',?,0,?,?,? WHERE NOT EXISTS (SELECT 1 FROM ("+requestRows+") requested LEFT JOIN products p ON p.id=requested.id WHERE p.id IS NULL OR p.active!=1 OR p.stock_quantity<requested.qty)"+couponGuard;
+ const statements=[db.prepare("INSERT INTO customers (name,email,phone) VALUES (?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,phone=excluded.phone").bind(name,email,phone),db.prepare(orderSql).bind(orderNumber,email,subtotal,discount,total,addressJson,...stockBindings,...(coupon?[coupon.id]:[]))];
  for(const item of items){statements.push(db.prepare("INSERT INTO order_items (order_id,product_id,product_name,sku,size,color,quantity,unit_price_cents) SELECT o.id,p.id,p.name,p.sku,?,NULL,?,p.price_cents FROM orders o JOIN products p ON p.id=? WHERE o.order_number=?").bind(item.size||null,item.quantity,item.id,orderNumber));}
  for(const item of items){statements.push(db.prepare("UPDATE products SET stock_quantity=stock_quantity-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS (SELECT 1 FROM orders WHERE order_number=?)").bind(item.quantity,item.id,orderNumber));}
+ if(coupon){
+  statements.push(db.prepare("UPDATE coupons SET used_count=used_count+1 WHERE id=? AND active=1 AND (max_uses IS NULL OR used_count<max_uses) AND EXISTS (SELECT 1 FROM orders WHERE order_number=?)").bind(coupon.id,orderNumber));
+  statements.push(db.prepare("INSERT INTO order_coupon_redemptions (order_id,coupon_id,code,discount_cents) SELECT id,?,?,? FROM orders WHERE order_number=?").bind(coupon.id,coupon.code,discount,orderNumber));
+ }
  const results=await db.batch(statements);
  if(!results[1]?.meta?.changes)return json({error:"O estoque mudou enquanto você finalizava. Atualize a sacola e tente novamente."},409);
- return json({ok:true,order_number:orderNumber,total_cents:subtotal,message:"Pedido registrado. A loja precisa confirmar as condições de pagamento e entrega."},201);
+ return json({ok:true,order_number:orderNumber,subtotal_cents:subtotal,discount_cents:discount,total_cents:total,coupon_code:coupon?.code||null,message:"Pedido registrado. A loja precisa confirmar as condições de pagamento e entrega."},201);
 }
 export async function onRequest({request,env}){
  try{
