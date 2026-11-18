@@ -32,7 +32,7 @@ export async function onRequest({request, env}) {
   if(!env.DB) return json({error:"Banco de dados não configurado."},503);
   if(!env.ADMIN_PASSWORD) return json({error:"Configure ADMIN_PASSWORD nos Secrets do Cloudflare Pages."},503);
   const url = new URL(request.url);
-  if(request.method === "POST" && url.pathname.endsWith("/login")) {
+  if(request.method === "POST" && url.searchParams.get("action") === "login") {
     let body; try { body=await request.json(); } catch { return json({error:"Dados inválidos."},400); }
     if(typeof body.password !== "string" || body.password !== env.ADMIN_PASSWORD) return json({error:"Senha incorreta."},401);
     return json({token:await token(env.ADMIN_PASSWORD, Date.now()+12*60*60*1000)});
