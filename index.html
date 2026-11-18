@@ -45,6 +45,63 @@ footer{background:#123f40;color:#e5f0e8}footer b{color:#f2c66d}footer a:hover{co
 .cart{background:#fffdf8}.cart-head{border-color:#dce9e1}.cart-total{color:#174b4a}.checkout input,.coupon-entry input,.size-select{border-color:#d2e1d8}
 .product-modal-card{background:#fffdf8}.product-modal-copy h2,.modal-close{color:#123f40}
 @media(max-width:800px){.hero{background:#f5e7d2}}
+
+/* NOVA VITRINE HADASSA — redesign editorial tropical */
+:root{--teal:#087f83;--deep:#123f40;--coral:#e98269;--sand:#f5e7d2;--cream:#fffdf8;--gold:#f2c66d}
+body{background:#fffdf8;color:#173f3d}
+.announcement{font-size:10px;letter-spacing:2px;padding:12px;background:#123f40}
+.header{height:78px;padding:0 clamp(18px,6vw,88px);box-shadow:0 5px 24px #123f400a}
+.brand b{font-size:31px;letter-spacing:4px}
+.nav{gap:clamp(12px,2vw,30px)}
+.nav button,.nav a{font-size:12px;font-weight:700}
+.actions{gap:10px}.actions button{padding:10px 13px;border:1px solid #d8e7df;border-radius:30px;font-weight:700}
+.hero{position:relative;grid-template-columns:46% 54%;min-height:660px;background:linear-gradient(125deg,#f7e8d3 0%,#f7e8d3 54%,#e4f0e9 54%,#e4f0e9 100%);overflow:hidden}
+.hero-copy{padding:85px 7% 85px 15%;position:relative;z-index:1}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:#fffdf8b8;padding:9px 13px;border-radius:30px;font-size:10px;letter-spacing:2px}
+.hero h1{font-size:clamp(52px,6.2vw,84px);line-height:.98;letter-spacing:-2px;margin:25px 0}
+.hero p{font-size:15px;max-width:330px;line-height:1.9}
+.hero .cta{border-radius:30px;padding:17px 25px;box-shadow:0 10px 24px #087f8328}
+.hero-image{min-height:660px;margin:22px 22px 22px 0;border-radius:190px 12px 12px 12px;overflow:hidden}
+.hero-image img{object-position:center 35%;transition:transform 1s}.hero:hover .hero-image img{transform:scale(1.035)}
+.stamp{width:116px;height:116px;left:25px;bottom:25px;border:7px solid #fffdf8;font-size:14px}
+.benefits{padding:24px 7%;font-size:11px;font-weight:700;letter-spacing:.6px}
+.section{padding:100px clamp(20px,7vw,110px)}
+.section-head{align-items:center}.section h2{font-size:clamp(38px,4.5vw,58px);letter-spacing:-1px}
+.section-head p{font-size:13px;max-width:210px;line-height:1.7}
+.filters{gap:10px;margin:34px 0}.filters button{padding:12px 19px;border-radius:30px;font-weight:700;font-size:11px;background:#fff;border-color:#dce9e1}
+.products{grid-template-columns:repeat(3,minmax(0,1fr));gap:44px 24px}
+.product{min-width:0}.product-photo{height:clamp(290px,35vw,470px);border-radius:12px;overflow:hidden}
+.product-photo img{transition:transform .7s}.product:hover .product-photo img{transform:scale(1.06)}
+.tag{border-radius:30px;padding:8px 12px;font-weight:700;letter-spacing:1px}
+.add{border-radius:8px;padding:15px;text-transform:uppercase;letter-spacing:1px;font-size:10px;box-shadow:0 5px 18px #123f4010}
+.product-info{align-items:flex-start;margin-top:16px}.product-info h3{font-size:19px}.product-info strong{font-size:15px;white-space:nowrap}
+.details-link{font-size:10px;border-bottom:1px solid #087f8360;padding-bottom:4px}
+.story{grid-template-columns:1.05fr .95fr;align-items:stretch}.story img{min-height:540px;max-height:650px;object-fit:cover}
+.story-copy{padding:75px 12%}.story h2{font-size:clamp(42px,4.6vw,60px)}
+.newsletter{padding:95px 20px;background:radial-gradient(circle at 50% 0%,#ffe4cb 0,#fff1df 48%,#fff8ef 100%)}
+.newsletter h2{font-size:clamp(42px,5vw,62px)}
+footer{padding:60px 7% 24px;gap:35px;font-size:12px}
+.cart{box-shadow:-15px 0 50px #123f4020}.cart-head h2{font:600 25px 'Playfair Display'}
+.cta{border-radius:8px}
+@media(max-width:800px){
+ .header{height:70px}.hero{grid-template-columns:1fr;min-height:0;background:#f5e7d2}
+ .hero-copy{padding:58px 8% 35px}.hero h1{font-size:clamp(52px,12vw,72px)}
+ .hero-image{min-height:480px;margin:0 14px 14px;border-radius:130px 10px 10px 10px}
+ .benefits{gap:12px}.section{padding:68px 5%}
+ .products{grid-template-columns:repeat(2,minmax(0,1fr));gap:30px 14px}
+ .product-photo{height:clamp(220px,48vw,340px)}
+ .story{grid-template-columns:1fr}.story img{min-height:340px;max-height:420px}.story-copy{padding:55px 8%}
+ footer{gap:25px}
+}
+@media(max-width:480px){
+ .announcement{font-size:8px;letter-spacing:1.2px}.brand b{font-size:25px}
+ .actions{gap:4px}.actions button{font-size:11px;padding:9px 10px}
+ .hero-copy{padding-top:48px}.hero-image{min-height:370px}
+ .benefits{font-size:10px}.products{gap:25px 10px}.product-photo{height:235px}
+ .product-info h3{font-size:15px}.product-info strong{font-size:13px}
+ .section h2{font-size:36px}.section-head p{font-size:12px}
+ footer{grid-template-columns:1fr 1fr;padding:42px 6% 20px}
+}
 </style></head>
 <body>
 <div class="announcement">HADASSA MODA ✦ ELEGÂNCIA À BEIRA-MAR ✦ ATENDIMENTO PERSONALIZADO</div>
