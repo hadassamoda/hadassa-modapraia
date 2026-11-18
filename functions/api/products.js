@@ -120,6 +120,8 @@ export async function onRequest({request,env}) {
     if(request.method==="DELETE") {
       const id=Number(url.searchParams.get("id"));
       if(!Number.isInteger(id)||id<1) return json({error:"ID inválido."},400);
+      const linked=await env.DB.prepare("SELECT id FROM order_items WHERE product_id=? LIMIT 1").bind(id).first();
+      if(linked) return json({error:"Este produto já aparece em um pedido e não pode ser apagado. Edite e marque como Inativo para preservar o histórico."},409);
       try {
         await env.DB.prepare("DELETE FROM product_images WHERE product_id=?").bind(id).run();
         const r=await env.DB.prepare("DELETE FROM products WHERE id=?").bind(id).run();
